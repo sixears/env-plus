@@ -14,6 +14,9 @@ module Env.Types
   )
 where
 
+import Control.Monad  ( mapM_ )
+import Control.Monad.State  ( execState, modify )
+
 -- base --------------------------------
 
 import Control.Applicative     ( many )
@@ -273,8 +276,17 @@ alterEnvTests =
 
 {- | Apply a set of modifications to a Environment -}
 runEnvMod ∷ EnvMod → Env → Env
-runEnvMod (EnvMod [])       env = env
-runEnvMod (EnvMod (f : fs)) env = runEnvMod (EnvMod fs) (f env)
+-- execState ∷ State s a {- state-passing computation to execute -}
+--                 (EnvMod es) ⤳ (mapM_ modify es)
+--           → s {- initial value -}                                -- Env
+--           → s {- final state -}                                  -- Env
+--
+-- Thus `modify` is the key here, that's the thing that 'introduces' the
+-- MonadState, using an s → s transformation that is encapsulated within
+-- EnvMod; `mapM_` covers the fact that there are a sequence of them.
+-- There is no extra result to each modification, hence `mapM_` rather than
+-- `mapM` and `execState` rather than `runState`.
+runEnvMod (EnvMod es) s0 = execState (mapM_ modify es) s0
 
 --------------------------------------------------------------------------------
 --                                   tests                                    --

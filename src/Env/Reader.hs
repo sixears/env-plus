@@ -74,7 +74,7 @@ import Test.Tasty  ( TestTree, testGroup )
 
 -- tasty-hunit -------------------------
 
-import Test.Tasty.HUnit  ( testCase )
+import Test.Tasty.HUnit  ( (@=?), testCase )
 
 -- tasty-plus --------------------------
 
@@ -153,11 +153,11 @@ envParseTests =
       kx = "TEST_ENV_ERRX" ∷ EnvKey
    in testGroup "envParse"
                 [ testCase "TEST_ENV_VAL" $ setEnv "TEST_ENV_VAL" "7" True ⪼
-                      parseNat "TEST_ENV_VAL" ≫ (Right 7 ≟)
+                      parseNat "TEST_ENV_VAL" ≫ (Right 7 @=?)
                 , testCase "TEST_ENV_ERR" $ setEnv "TEST_ENV_ERR" x True ⪼
-                      parseNat "TEST_ENV_ERR" ≫ (Left (asTestError x) ≟)
+                      parseNat "TEST_ENV_ERR" ≫ (Left (asTestError x) @=?)
                 , testCase "TEST_ENV_ERRX" $
-                      (parseNat kx) ≫ (Left (missingEnv kx) ≟)
+                      (parseNat kx) ≫ (Left (missingEnv kx) @=?)
                 ]
 
 ----------------------------------------
@@ -186,11 +186,11 @@ envParseETests =
       kx = "TEST_ENV_ERRX" ∷ EnvKey
    in testGroup "envParseE"
                 [ testCase "TEST_ENV_VAR2" $ setEnv "TEST_ENV_VAR" "8" True ⪼
-                      (parseNat2 "TEST_ENV_VAR") ≫ (Right 8 ≟)
+                      (parseNat2 "TEST_ENV_VAR") ≫ (Right 8 @=?)
                 , testCase "TEST_ENV_ERR2" $ setEnv "TEST_ENV_ERR" y True ⪼
-                      (parseNat2 "TEST_ENV_ERR") ≫ (Left (asTestError y) ≟)
+                      (parseNat2 "TEST_ENV_ERR") ≫ (Left (asTestError y) @=?)
                 , testCase "TEST_ENV_ERRX" $
-                      (parseNat2 kx) ≫ (Left (missingEnv kx) ≟)
+                      (parseNat2 kx) ≫ (Left (missingEnv kx) @=?)
                 ]
 
 ----------------------------------------
@@ -217,11 +217,11 @@ envParseYTests =
       z = "z" ∷ String
    in testGroup "envParseY"
                 [ testCase "TEST_ENV_VAR2" $ setEnv "TEST_ENV_VAR" "13" True ⪼
-                      (parseNatY "TEST_ENV_VAR") ≫ (Right (Just 13) ≟)
+                      (parseNatY "TEST_ENV_VAR") ≫ (Right (Just 13) @=?)
                 , testCase "TEST_ENV_ERR" $ setEnv "TEST_ENV_ERR" z True ⪼
-                      parseNatY "TEST_ENV_ERR" ≫ (Left (asTestError z) ≟)
+                      parseNatY "TEST_ENV_ERR" ≫ (Left (asTestError z) @=?)
                 , testCase "TEST_ENV_ERRX" $
-                      (parseNatY "TEST_ENV_ERRX") ≫ (Right Nothing ≟)
+                      (parseNatY "TEST_ENV_ERRX") ≫ (Right Nothing @=?)
                 ]
 
 ----------------------------------------
@@ -248,11 +248,11 @@ envParseYETests =
       z = "z" ∷ String
    in testGroup "envParseYE"
                 [ testCase "TEST_ENV_VAR2" $ setEnv "TEST_ENV_VAR" "7" True ⪼
-                      (parseNatY' "TEST_ENV_VAR") ≫ (Right (Just 7) ≟)
+                      (parseNatY' "TEST_ENV_VAR") ≫ (Right (Just 7) @=?)
                 , testCase "TEST_ENV_ERR" $ setEnv "TEST_ENV_ERR" z True ⪼
-                      parseNatY' "TEST_ENV_ERR" ≫ (Left (asTestError z) ≟)
+                      parseNatY' "TEST_ENV_ERR" ≫ (Left (asTestError z) @=?)
                 , testCase "TEST_ENV_ERRX" $
-                      (parseNatY' "TEST_ENV_ERRX") ≫ (Right Nothing ≟)
+                      (parseNatY' "TEST_ENV_ERRX") ≫ (Right Nothing @=?)
                 ]
 
 ----------------------------------------
