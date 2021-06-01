@@ -78,7 +78,7 @@ import Test.Tasty.HUnit  ( (@=?), testCase )
 
 -- tasty-plus --------------------------
 
-import TastyPlus  ( (≟), runTestsP, runTestsReplay, runTestTree )
+import TastyPlus  ( runTestsP, runTestsReplay, runTestTree )
 
 -- unix --------------------------------
 
@@ -304,14 +304,14 @@ instance Show α ⇒ AsTestError (EnvTestError α) α where
 
 readErr ∷ (AsTestError ε String, MonadError ε η, Read α) ⇒ String → η α
 readErr s = maybe (asTestError_ s) return $ readMaybe s
-      
+
 ------------------------------------------------------------
 
 tests ∷ TestTree
 tests = testGroup "Env.Reader" [ envParseTests, envParseETests
                                , envParseYTests, envParseYETests
                                ]
-                                
+
 ----------------------------------------
 
 _test ∷ IO ExitCode

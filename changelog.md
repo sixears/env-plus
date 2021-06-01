@@ -1,7 +1,6 @@
-1.3.0.0 2020-02-15
+1.0.1.0 2021-06-01
 ==================
-- use tasty-plus 1.3.0.0
-- use Control.Monad.State to do the transformation
+- Add Printable instance of Env
 
 1.0.0.0 2019-10-03
 ==================

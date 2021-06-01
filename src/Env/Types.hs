@@ -21,21 +21,26 @@ import Control.Monad.State  ( execState, modify )
 
 import Control.Applicative     ( many )
 import Data.Bifunctor          ( bimap )
+import Data.Char               ( isAlphaNum )
 import Data.Eq                 ( Eq )
+import Data.Foldable           ( all, concatMap )
 import Data.Function           ( ($), const, id )
 import Data.Functor            ( fmap )
 import Data.List               ( replicate, reverse )
-import Data.Maybe              ( Maybe, catMaybes )
+import Data.Maybe              ( catMaybes )
 import Data.Monoid             ( Monoid( mappend, mconcat, mempty ) )
 import Data.Ord                ( Ord )
 import Data.Semigroup          ( Semigroup( (<>) ) )
-import Data.String             ( IsString( fromString ), String )
+import Data.String             ( IsString( fromString ) )
 import System.Exit             ( ExitCode )
 import System.IO               ( IO )
 import Text.Show               ( Show )
 
 -- base-unicode-symbols ----------------
 
+import Data.Bool.Unicode      ( (∨) )
+import Data.Eq.Unicode        ( (≡) )
+import Data.Foldable.Unicode  ( (∈) )
 import Data.Function.Unicode  ( (∘) )
 import Data.Monoid.Unicode    ( (⊕) )
 
@@ -53,9 +58,12 @@ import Data.MonoTraversable  ( Element, MonoFunctor( omap ) )
 
 -- more-unicode ------------------------
 
+import Data.MoreUnicode.Bool     ( 𝔹 )
+import Data.MoreUnicode.Char     ( ℂ )
 import Data.MoreUnicode.Functor  ( (⊳), (⩺) )
+import Data.MoreUnicode.Maybe    ( 𝕄 )
 import Data.MoreUnicode.Natural  ( ℕ )
-import Data.MoreUnicode.Tasty    ( (≟) )
+import Data.MoreUnicode.String   ( 𝕊 )
 
 -- parsers -----------------------------
 
@@ -67,7 +75,7 @@ import Test.Tasty  ( TestTree, testGroup )
 
 -- tasty-hunit -------------------------
 
-import Test.Tasty.HUnit  ( testCase )
+import Test.Tasty.HUnit  ( (@=?), testCase )
 
 -- tasty-plus --------------------------
 
@@ -77,6 +85,10 @@ import TastyPlus  ( runTestsP, runTestsReplay, runTestTree )
 
 import qualified  Text.Printer  as  P
 
+-- tfmt --------------------------------
+
+import Text.Fmt  ( fmt, fmtS )
+
 --------------------------------------------------------------------------------
 
 class FromP α where
@@ -84,7 +96,7 @@ class FromP α where
 
 ------------------------------------------------------------
 
-newtype EnvKey  = EnvKey { unKey :: String }
+newtype EnvKey  = EnvKey { unKey ∷ 𝕊 }
   deriving (Eq, Ord, Show)
 
 instance Printable EnvKey where
@@ -101,7 +113,7 @@ instance FromP EnvKey where
 
 ------------------------------------------------------------
 
-newtype EnvVal  = EnvVal { unVal :: String }
+newtype EnvVal  = EnvVal { unVal ∷ 𝕊 }
   deriving (Eq, Show)
 
 instance Printable EnvVal where
@@ -123,6 +135,27 @@ instance FromP EnvVal where
 newtype Env = Env { unEnv ∷ Map.Map EnvKey EnvVal }
   deriving (Eq, Show)
 
+shell_quote ∷ 𝕊 → 𝕊
+shell_quote s =
+  let is_safe ∷ ℂ → 𝔹
+      is_safe c = '_' ≡ c ∨ isAlphaNum c
+      quote_char ∷ ℂ → 𝕊
+      quote_char c = if isAlphaNum c
+                     then [c]
+                     else if '_' ≡ c
+                          then [c]
+                          else "\\" ⊕ [c]
+  in if all is_safe s
+     then s
+     else if '\'' ∈ s
+          then concatMap quote_char s
+          else "'" ⊕ s ⊕ "'"
+
+instance Printable Env where
+  print e =
+    P.text $ let qu = shell_quote
+              in [fmt|[%L]|] [ [fmtS|%s=%s|] (qu k) (qu v) | (k,v) ← strsEnv e ]
+
 {- | Construct an Env from a Map from EnvKeys to EnvVals. -}
 fromMap ∷ Map.Map EnvKey EnvVal → Env
 fromMap = Env
@@ -143,7 +176,7 @@ fromListT = fromMapT ∘ Map.fromList
 ----------------------------------------
 
 {- | Convert back to `base`-format environment (list of pairs of `String`s). -}
-strsEnv ∷ Env → [(String, String)]
+strsEnv ∷ Env → [(𝕊, 𝕊)]
 strsEnv = bimap toString toString ⩺ Map.toList ∘ unEnv
 
 ----------------------------------------
@@ -160,8 +193,8 @@ omapTests =
       f = fromString ∘ (\ t → t ⊕ reverse t) ∘ toString
    in testGroup "omap"
                 [ testCase "t ++ reverse t" $
-                      Env (Map.fromList [("a", "cattac"), ("c", "doggod")])
-                    ≟ omap f e1
+                        Env (Map.fromList [("a", "cattac"), ("c", "doggod")])
+                    @=? omap f e1
                 ]
 
 innerMap ∷ (Map.Map EnvKey EnvVal → Map.Map EnvKey EnvVal) → Env → Env
@@ -171,7 +204,7 @@ innerMap f = Env ∘ f ∘ unEnv
      strings.
  -}
 smap ∷ (Ord τ, Printable τ, Printable σ) ⇒
-       ([(String,String)] → [(τ,σ)]) → Env → Env
+       ([(𝕊,𝕊)] → [(τ,σ)]) → Env → Env
 smap f = fromListT ∘ f ∘ strsEnv
 
 {- | "Map" a function over pairs of keys, expressed as `Strings`.  This is not a
@@ -181,7 +214,7 @@ smap f = fromListT ∘ f ∘ strsEnv
      conversion issues.
  -}
 mapf ∷ (Ord τ, Printable τ, Printable σ) ⇒
-       ((String,String) → Maybe (τ,σ)) → Env → Env
+       ((𝕊,𝕊) → 𝕄 (τ,σ)) → Env → Env
 mapf f = fromListT ∘ catMaybes ∘ fmap f ∘ strsEnv
 
 ------------------------------------------------------------
@@ -220,12 +253,12 @@ clearEnv = EnvMod [ innerMap ∘ const $ Map.empty ]
 
 {- | Update or delete the value attached to a key in the environment; no-op for
      a key that doesn't exist in the environment.. -}
-updateEnv ∷ (EnvVal → Maybe EnvVal) → EnvKey → EnvMod
+updateEnv ∷ (EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
 updateEnv f = updateEnvT (f ∘ fromString)
 
 {- | Update or delete the value attached to a key in the environment; no-op for
      a key that doesn't exist in the environment.. -}
-updateEnvT ∷ (Printable τ, Printable σ) ⇒ (String → Maybe σ) → τ → EnvMod
+updateEnvT ∷ (Printable τ, Printable σ) ⇒ (𝕊 → 𝕄 σ) → τ → EnvMod
 updateEnvT f k =
   EnvMod [ innerMap $ Map.update (fromP ⩺ f ∘ toString) (fromP k) ]
 
@@ -236,7 +269,7 @@ adjustEnv f = adjustEnvT (f ∘ fromString)
 
 {- | Update the value attached to a key in the environment; no-op if the key is
      not in the environment. -}
-adjustEnvT ∷ (Printable τ, Printable σ) ⇒ (String → σ) → τ → EnvMod
+adjustEnvT ∷ (Printable τ, Printable σ) ⇒ (𝕊 → σ) → τ → EnvMod
 adjustEnvT f k =
   EnvMod [ innerMap $ Map.adjust (fromP ∘ f ∘ toString) (fromP k) ]
 
@@ -244,12 +277,12 @@ adjustEnvT f k =
 
 {- | Update or delete the value or non-value attached to a key in the
      environment. -}
-alterEnv ∷ (Maybe EnvVal → Maybe EnvVal) → EnvKey → EnvMod
+alterEnv ∷ (𝕄 EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
 alterEnv f = alterEnvT (f ∘ fmap fromString)
 
 {- | Update or delete the value or non-value attached to a key in the
      environment. -}
-alterEnvT ∷ (Printable τ, Printable σ) ⇒ (Maybe String → Maybe σ) → τ → EnvMod
+alterEnvT ∷ (Printable τ, Printable σ) ⇒ (𝕄 𝕊 → 𝕄 σ) → τ → EnvMod
 alterEnvT f k =
   EnvMod [ innerMap $ Map.alter (fromP ⩺ f ∘ fmap toString) (fromP k) ]
 
@@ -257,19 +290,19 @@ alterEnvT f k =
 
 alterEnvTests ∷ TestTree
 alterEnvTests =
-  let a = "a" ∷ String
+  let a = "a" ∷ 𝕊
    in testGroup "alterEnv"
-                [ testCase "id (a)" $ e1 ≟ runEnvMod (alterEnv id "a") e1
-                , testCase "id (e)" $ e1 ≟ runEnvMod (alterEnv id "e") e1
+                [ testCase "id (a)" $ e1 @=? runEnvMod (alterEnv id "a") e1
+                , testCase "id (e)" $ e1 @=? runEnvMod (alterEnv id "e") e1
                 , testCase "reverse (a)" $
-                      Env (Map.fromList [("a", "tac"), ("c", "dog")])
-                    ≟ runEnvMod (alterEnvT (fmap reverse) a) e1
+                        Env (Map.fromList [("a", "tac"), ("c", "dog")])
+                    @=? runEnvMod (alterEnvT (fmap reverse) a) e1
                 , testCase "reverse (e)" $
-                      e1 ≟ runEnvMod (alterEnvT (fmap reverse) ("e" ∷ String)) e1
+                      e1 @=? runEnvMod (alterEnvT (fmap reverse) ("e" ∷ 𝕊)) e1
                 , testCase "reverse - replicate (a)" $
                       Env (Map.fromList [("a", "tactac"), ("c", "dog")])
-                    ≟ runEnvMod (  alterEnvT (fmap reverse) a
-                                 ⊕ alterEnvT (fmap (mconcat ∘ replicate 2)) a) e1
+                    @=? runEnvMod (  alterEnvT (fmap reverse) a
+                                   ⊕ alterEnvT (fmap (mconcat ∘ replicate 2)) a) e1
                 ]
 
 ----------------------------------------
@@ -305,10 +338,10 @@ _test = runTestTree tests
 
 --------------------
 
-_tests ∷ String → IO ExitCode
+_tests ∷ 𝕊 → IO ExitCode
 _tests = runTestsP tests
 
-_testr ∷ String → ℕ → IO ExitCode
+_testr ∷ 𝕊 → ℕ → IO ExitCode
 _testr = runTestsReplay tests
 
 -- that's all, folks! ----------------------------------------------------------
