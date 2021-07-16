@@ -1,9 +1,5 @@
 {-# LANGUAGE UnicodeSyntax #-}
 
--- base --------------------------------
-
-import System.IO  ( IO )
-
 -- tasty -------------------------------
 
 import Test.Tasty           ( TestTree, defaultIngredients, testGroup )
@@ -14,7 +10,7 @@ import Test.Tasty.Runners   ( defaultMainWithIngredients )
 ------------------------------------------------------------
 
 import qualified Env.Reader
-import qualified Env.Types 
+import qualified Env.Types
 
 --------------------------------------------------------------------------------
 

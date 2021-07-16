@@ -1,9 +1,3 @@
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE InstanceSigs      #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE UnicodeSyntax     #-}
-
 module Env.Types
   ( Env( Env, unEnv ), EnvKey( EnvKey ), EnvMod, EnvVal, FromP( fromP )
   , adjustEnv, adjustEnvT, alterEnv, alterEnvT, clearEnv
@@ -32,6 +26,7 @@ import Data.Monoid             ( Monoid( mappend, mconcat, mempty ) )
 import Data.Ord                ( Ord )
 import Data.Semigroup          ( Semigroup( (<>) ) )
 import Data.String             ( IsString( fromString ) )
+import GHC.Generics            ( Generic )
 import System.Exit             ( ExitCode )
 import System.IO               ( IO )
 import Text.Show               ( Show )
@@ -51,6 +46,10 @@ import qualified Data.Map  as  Map
 -- data-textual ------------------------
 
 import Data.Textual  ( Printable( print ), Textual( textual ), toString )
+
+-- deepseq -----------------------------
+
+import Control.DeepSeq  ( NFData )
 
 -- mono-traversable --------------------
 
@@ -97,7 +96,7 @@ class FromP α where
 ------------------------------------------------------------
 
 newtype EnvKey  = EnvKey { unKey ∷ 𝕊 }
-  deriving (Eq, Ord, Show)
+  deriving (Eq,Generic,NFData,Ord,Show)
 
 instance Printable EnvKey where
   print (EnvKey t) = P.string t
@@ -114,7 +113,7 @@ instance FromP EnvKey where
 ------------------------------------------------------------
 
 newtype EnvVal  = EnvVal { unVal ∷ 𝕊 }
-  deriving (Eq, Show)
+  deriving (Eq,Generic,NFData,Show)
 
 instance Printable EnvVal where
   print (EnvVal t) = P.string t
@@ -133,7 +132,7 @@ instance FromP EnvVal where
 -- I dislike using a List of Pairs here, as then `getEnv ∘ setEnv` is not `id`
 -- in general (i.e., in the presence of duplicate keys, or differing sorts)
 newtype Env = Env { unEnv ∷ Map.Map EnvKey EnvVal }
-  deriving (Eq, Show)
+  deriving (Eq,Generic,NFData,Show)
 
 shell_quote ∷ 𝕊 → 𝕊
 shell_quote s =
