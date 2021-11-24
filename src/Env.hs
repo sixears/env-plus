@@ -1,6 +1,3 @@
-{-# LANGUAGE LambdaCase    #-}
-{-# LANGUAGE UnicodeSyntax #-}
-
 module Env
   ( adjustEnv, adjustEnvT, alterEnv, alterEnvT, clearEnv, getEnv, getEnvT
   , getEnvironment, setEnv, setEnvT, setEnvironment, unsetEnv, unsetEnvT

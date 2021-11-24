@@ -1,11 +1,3 @@
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE UnicodeSyntax         #-}
-
 module Env.Reader
   ( EnvReader
   , envAsk, envGet, envGetT, envLookup, envLookupM

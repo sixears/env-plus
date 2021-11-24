@@ -1,3 +1,7 @@
+1.0.3.0 2021-11-23
+==================
+- rename many *Env to *EnvMod in Types to avoid clashes with fns from Env.hs
+
 1.0.2.0 2021-07-16
 ==================
 - Add NFData instances of Env{,Key,Val}

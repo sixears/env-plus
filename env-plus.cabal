@@ -7,7 +7,7 @@ name:                env-plus
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             1.0.2.0
+version:             1.0.3.0
 
 -- A short (one-line) description of the package.
 synopsis:            Utilities for working with the system environment
@@ -73,9 +73,9 @@ library
                      , deepseq, lens, mono-traversable, mtl, parsers, tasty
                      , tasty-hunit, text-printer, unix
 
-                     , monaderror-io >= 1.1.1.0
-                     , more-unicode  >= 0.0.15.0
-                     , tasty-plus    >= 1.5.0.2
+                     , monaderror-io >= 1.2.1.0
+                     , more-unicode  >= 0.0.16.0
+                     , tasty-plus    >= 1.5.1.0
                      , tfmt          >= 0.2.4.0
 
   -- Directories containing source files.

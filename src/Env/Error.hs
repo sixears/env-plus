@@ -1,7 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
-{-# LANGUAGE UnicodeSyntax     #-}
-
 module Env.Error
   ( AsEnvError(..), EnvError, envNoParse, envNoParse_, missingEnv, missingEnv_ )
 where

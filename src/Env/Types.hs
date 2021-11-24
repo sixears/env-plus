@@ -1,8 +1,9 @@
 module Env.Types
   ( Env( Env, unEnv ), EnvKey( EnvKey ), EnvMod, EnvVal, FromP( fromP )
-  , adjustEnv, adjustEnvT, alterEnv, alterEnvT, clearEnv
-  , fromList, fromListT, fromMap, fromMapT, mapf, setEnv, setEnvT, smap, strsEnv
-  , runEnvMod, unKey, unsetEnv, unsetEnvT, updateEnv, updateEnvT
+  , adjustEnvMod, adjustEnvModT, alterEnvMod, alterEnvModT, clearEnvMod
+  , fromList, fromListT, fromMap, fromMapT, mapf, setEnvMod, setEnvModT, smap
+  , strsEnv, runEnvMod, unKey, unsetEnvMod, unsetEnvModT, updateEnvMod
+  , updateEnvModT
 
   , tests
   )
@@ -228,80 +229,80 @@ instance Monoid EnvMod where
   mappend (EnvMod xs) (EnvMod ys) = EnvMod (xs ⊕ ys)
 
 {- | Clear a key/value from the environment. -}
-unsetEnv ∷ EnvKey → EnvMod
-unsetEnv = unsetEnvT
+unsetEnvMod ∷ EnvKey → EnvMod
+unsetEnvMod = unsetEnvModT
 
 {- | Clear a key/value from the environment. -}
-unsetEnvT ∷ Printable τ ⇒ τ → EnvMod
-unsetEnvT k = EnvMod [ innerMap $ Map.delete (fromP k) ]
+unsetEnvModT ∷ Printable τ ⇒ τ → EnvMod
+unsetEnvModT k = EnvMod [ innerMap $ Map.delete (fromP k) ]
 
 {- | Set a key to a constant value pair in the environment irrespective of any
      prior value or lack for that key. -}
-setEnv ∷ EnvKey → EnvVal → EnvMod
-setEnv = setEnv
+setEnvMod ∷ EnvKey → EnvVal → EnvMod
+setEnvMod = setEnvModT
 
 {- | Set a key to a constant value pair in the environment irrespective of any
      prior value or lack for that key. -}
-setEnvT ∷ (Printable τ, Printable σ) ⇒ τ → σ → EnvMod
-setEnvT k v =
+setEnvModT ∷ (Printable τ, Printable σ) ⇒ τ → σ → EnvMod
+setEnvModT k v =
   EnvMod [ innerMap $ Map.insert (fromP k) (fromP v) ]
 
 {- | Clear the environment; remove all keys. -}
-clearEnv ∷ EnvMod
-clearEnv = EnvMod [ innerMap ∘ const $ Map.empty ]
+clearEnvMod ∷ EnvMod
+clearEnvMod = EnvMod [ innerMap ∘ const $ Map.empty ]
 
 {- | Update or delete the value attached to a key in the environment; no-op for
      a key that doesn't exist in the environment.. -}
-updateEnv ∷ (EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
-updateEnv f = updateEnvT (f ∘ fromString)
+updateEnvMod ∷ (EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
+updateEnvMod f = updateEnvModT (f ∘ fromString)
 
 {- | Update or delete the value attached to a key in the environment; no-op for
      a key that doesn't exist in the environment.. -}
-updateEnvT ∷ (Printable τ, Printable σ) ⇒ (𝕊 → 𝕄 σ) → τ → EnvMod
-updateEnvT f k =
+updateEnvModT ∷ (Printable τ, Printable σ) ⇒ (𝕊 → 𝕄 σ) → τ → EnvMod
+updateEnvModT f k =
   EnvMod [ innerMap $ Map.update (fromP ⩺ f ∘ toString) (fromP k) ]
 
 {- | Update the value attached to a key in the environment; no-op if the key is
      not in the environment. -}
-adjustEnv ∷ (EnvVal → EnvVal) → EnvKey → EnvMod
-adjustEnv f = adjustEnvT (f ∘ fromString)
+adjustEnvMod ∷ (EnvVal → EnvVal) → EnvKey → EnvMod
+adjustEnvMod f = adjustEnvModT (f ∘ fromString)
 
 {- | Update the value attached to a key in the environment; no-op if the key is
      not in the environment. -}
-adjustEnvT ∷ (Printable τ, Printable σ) ⇒ (𝕊 → σ) → τ → EnvMod
-adjustEnvT f k =
+adjustEnvModT ∷ (Printable τ, Printable σ) ⇒ (𝕊 → σ) → τ → EnvMod
+adjustEnvModT f k =
   EnvMod [ innerMap $ Map.adjust (fromP ∘ f ∘ toString) (fromP k) ]
 
 ----------------------------------------
 
 {- | Update or delete the value or non-value attached to a key in the
      environment. -}
-alterEnv ∷ (𝕄 EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
-alterEnv f = alterEnvT (f ∘ fmap fromString)
+alterEnvMod ∷ (𝕄 EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
+alterEnvMod f = alterEnvModT (f ∘ fmap fromString)
 
 {- | Update or delete the value or non-value attached to a key in the
      environment. -}
-alterEnvT ∷ (Printable τ, Printable σ) ⇒ (𝕄 𝕊 → 𝕄 σ) → τ → EnvMod
-alterEnvT f k =
+alterEnvModT ∷ (Printable τ, Printable σ) ⇒ (𝕄 𝕊 → 𝕄 σ) → τ → EnvMod
+alterEnvModT f k =
   EnvMod [ innerMap $ Map.alter (fromP ⩺ f ∘ fmap toString) (fromP k) ]
 
 --------------------
 
-alterEnvTests ∷ TestTree
-alterEnvTests =
+alterEnvModTests ∷ TestTree
+alterEnvModTests =
   let a = "a" ∷ 𝕊
-   in testGroup "alterEnv"
-                [ testCase "id (a)" $ e1 @=? runEnvMod (alterEnv id "a") e1
-                , testCase "id (e)" $ e1 @=? runEnvMod (alterEnv id "e") e1
+   in testGroup "alterEnvMod"
+                [ testCase "id (a)" $ e1 @=? runEnvMod (alterEnvMod id "a") e1
+                , testCase "id (e)" $ e1 @=? runEnvMod (alterEnvMod id "e") e1
                 , testCase "reverse (a)" $
                         Env (Map.fromList [("a", "tac"), ("c", "dog")])
-                    @=? runEnvMod (alterEnvT (fmap reverse) a) e1
+                    @=? runEnvMod (alterEnvModT (fmap reverse) a) e1
                 , testCase "reverse (e)" $
-                      e1 @=? runEnvMod (alterEnvT (fmap reverse) ("e" ∷ 𝕊)) e1
+                      e1 @=? runEnvMod (alterEnvModT (fmap reverse) ("e" ∷ 𝕊)) e1
                 , testCase "reverse - replicate (a)" $
                       Env (Map.fromList [("a", "tactac"), ("c", "dog")])
-                    @=? runEnvMod (  alterEnvT (fmap reverse) a
-                                   ⊕ alterEnvT (fmap (mconcat ∘ replicate 2)) a) e1
+                    @=? runEnvMod (  alterEnvModT (fmap reverse) a
+                                   ⊕ alterEnvModT (fmap (mconcat ∘ replicate 2)) a) e1
                 ]
 
 ----------------------------------------
@@ -328,7 +329,7 @@ e1 ∷ Env
 e1 = Env $ Map.fromList [("a", "cat"), ("c", "dog")]
 
 tests ∷ TestTree
-tests = testGroup "Env.Types" [ omapTests, alterEnvTests ]
+tests = testGroup "Env.Types" [ omapTests, alterEnvModTests ]
 
 ----------------------------------------
 
