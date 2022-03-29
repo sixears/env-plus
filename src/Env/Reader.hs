@@ -8,28 +8,12 @@ module Env.Reader
   )
 where
 
-import Prelude ( )
+import Base1T
 
 -- base --------------------------------
 
-import Control.Monad           ( return, sequence )
-import Control.Monad.IO.Class  ( MonadIO )
-import Data.Bool               ( Bool( True ) )
-import Data.Either             ( Either( Left, Right ) )
-import Data.Eq                 ( Eq )
-import Data.Function           ( ($), id )
-import Data.Functor            ( (<$>), fmap )
-import Data.Maybe              ( Maybe( Just, Nothing ), maybe )
-import Data.String             ( String )
-import Data.Typeable           ( TypeRep )
-import System.Exit             ( ExitCode )
-import System.IO               ( IO )
-import Text.Read               ( Read, readMaybe )
-import Text.Show               ( Show )
-
--- base-unicode-symbols ----------------
-
-import Data.Function.Unicode  ( (∘) )
+import Data.Typeable  ( TypeRep )
+import Text.Read      ( Read, readMaybe )
 
 -- containers --------------------------
 
@@ -37,40 +21,16 @@ import qualified Data.Map  as  Map
 
 -- data-textual ------------------------
 
-import Data.Textual  ( Parsed( Malformed, Parsed ), Textual
-                     , parseString, toString )
+import Data.Textual  ( Parsed( Malformed, Parsed ), Textual, parseString )
 
 -- lens --------------------------------
 
-import Control.Lens.Prism    ( Prism', prism )
-import Control.Lens.Review   ( (#) )
-
--- monaderror-io -----------------------
-
-import MonadError  ( ѥ, splitMError )
-
--- more-unicode ------------------------
-
-import Data.MoreUnicode.Functor  ( (⊳) )
-import Data.MoreUnicode.Monad    ( (≫), (⪼) )
-import Data.MoreUnicode.Natural  ( ℕ )
+import Control.Lens.Prism  ( prism )
 
 -- mtl ---------------------------------
 
-import Control.Monad.Except  ( ExceptT, MonadError, runExceptT, throwError )
+import Control.Monad.Except  ( runExceptT )
 import Control.Monad.Reader  ( MonadReader, ReaderT, ask, runReaderT )
-
--- tasty -------------------------------
-
-import Test.Tasty  ( TestTree, testGroup )
-
--- tasty-hunit -------------------------
-
-import Test.Tasty.HUnit  ( (@=?), testCase )
-
--- tasty-plus --------------------------
-
-import TastyPlus  ( runTestsP, runTestsReplay, runTestTree )
 
 -- unix --------------------------------
 
@@ -144,9 +104,9 @@ envParseTests =
       x  = "x" ∷ String
       kx = "TEST_ENV_ERRX" ∷ EnvKey
    in testGroup "envParse"
-                [ testCase "TEST_ENV_VAL" $ setEnv "TEST_ENV_VAL" "7" True ⪼
+                [ testCase "TEST_ENV_VAL" $ setEnv "TEST_ENV_VAL" "7" 𝕿 ⪼
                       parseNat "TEST_ENV_VAL" ≫ (Right 7 @=?)
-                , testCase "TEST_ENV_ERR" $ setEnv "TEST_ENV_ERR" x True ⪼
+                , testCase "TEST_ENV_ERR" $ setEnv "TEST_ENV_ERR" x 𝕿 ⪼
                       parseNat "TEST_ENV_ERR" ≫ (Left (asTestError x) @=?)
                 , testCase "TEST_ENV_ERRX" $
                       (parseNat kx) ≫ (Left (missingEnv kx) @=?)
@@ -177,9 +137,9 @@ envParseETests =
       y = "y" ∷ String
       kx = "TEST_ENV_ERRX" ∷ EnvKey
    in testGroup "envParseE"
-                [ testCase "TEST_ENV_VAR2" $ setEnv "TEST_ENV_VAR" "8" True ⪼
+                [ testCase "TEST_ENV_VAR2" $ setEnv "TEST_ENV_VAR" "8" 𝕿 ⪼
                       (parseNat2 "TEST_ENV_VAR") ≫ (Right 8 @=?)
-                , testCase "TEST_ENV_ERR2" $ setEnv "TEST_ENV_ERR" y True ⪼
+                , testCase "TEST_ENV_ERR2" $ setEnv "TEST_ENV_ERR" y 𝕿 ⪼
                       (parseNat2 "TEST_ENV_ERR") ≫ (Left (asTestError y) @=?)
                 , testCase "TEST_ENV_ERRX" $
                       (parseNat2 kx) ≫ (Left (missingEnv kx) @=?)
@@ -208,9 +168,9 @@ envParseYTests =
       parseNatY = parseY
       z = "z" ∷ String
    in testGroup "envParseY"
-                [ testCase "TEST_ENV_VAR2" $ setEnv "TEST_ENV_VAR" "13" True ⪼
+                [ testCase "TEST_ENV_VAR2" $ setEnv "TEST_ENV_VAR" "13" 𝕿 ⪼
                       (parseNatY "TEST_ENV_VAR") ≫ (Right (Just 13) @=?)
-                , testCase "TEST_ENV_ERR" $ setEnv "TEST_ENV_ERR" z True ⪼
+                , testCase "TEST_ENV_ERR" $ setEnv "TEST_ENV_ERR" z 𝕿 ⪼
                       parseNatY "TEST_ENV_ERR" ≫ (Left (asTestError z) @=?)
                 , testCase "TEST_ENV_ERRX" $
                       (parseNatY "TEST_ENV_ERRX") ≫ (Right Nothing @=?)
@@ -239,9 +199,9 @@ envParseYETests =
       parseNatY' = parseY'
       z = "z" ∷ String
    in testGroup "envParseYE"
-                [ testCase "TEST_ENV_VAR2" $ setEnv "TEST_ENV_VAR" "7" True ⪼
+                [ testCase "TEST_ENV_VAR2" $ setEnv "TEST_ENV_VAR" "7" 𝕿 ⪼
                       (parseNatY' "TEST_ENV_VAR") ≫ (Right (Just 7) @=?)
-                , testCase "TEST_ENV_ERR" $ setEnv "TEST_ENV_ERR" z True ⪼
+                , testCase "TEST_ENV_ERR" $ setEnv "TEST_ENV_ERR" z 𝕿 ⪼
                       parseNatY' "TEST_ENV_ERR" ≫ (Left (asTestError z) @=?)
                 , testCase "TEST_ENV_ERRX" $
                       (parseNatY' "TEST_ENV_ERRX") ≫ (Right Nothing @=?)

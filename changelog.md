@@ -1,3 +1,8 @@
+1.0.4.0 2022-03-29
+==================
+- Add text descriptions to EnvMod
+- clearEnvMod now takes a set of keys to keep.
+
 1.0.3.0 2021-11-23
 ==================
 - rename many *Env to *EnvMod in Types to avoid clashes with fns from Env.hs

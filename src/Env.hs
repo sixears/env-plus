@@ -5,30 +5,12 @@ module Env
   )
 where
 
+import Base1T
+
 -- base --------------------------------
 
 import Control.Exception.Base  ( bracket )
-import Control.Monad           ( return )
-import Control.Monad.IO.Class  ( MonadIO, liftIO )
-import Data.Bool               ( Bool( True ) )
-import Data.Function           ( ($), const )
-import Data.Functor            ( fmap )
-import Data.Maybe              ( Maybe( Just, Nothing ) )
-import Data.String             ( String, fromString )
-import System.IO               ( IO )
-
--- base-unicode-symbols ----------------
-
-import Data.Function.Unicode  ( (∘) )
-
--- data-textual ------------------------
-
-import Data.Textual  ( Printable, toString )
-
--- more-unicode ------------------------
-
-import Data.MoreUnicode.Functor  ( (⊳) )
-import Data.MoreUnicode.Monad    ( (≫) )
+import Data.String             ( fromString )
 
 -- unix --------------------------------
 
@@ -70,7 +52,7 @@ setEnv = setEnvT
 setEnvT ∷ (MonadIO μ, Printable τ, Printable σ) ⇒ τ → σ → μ ()
 setEnvT k v =
   liftIO $
-    PosixEnv.setEnv (fromString $ toString k) (fromString $ toString v) True
+    PosixEnv.setEnv (fromString $ toString k) (fromString $ toString v) 𝕿
 
 {- | Clear a value from the environment. -}
 unsetEnv ∷ MonadIO μ ⇒ EnvKey → μ ()

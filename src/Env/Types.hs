@@ -1,52 +1,44 @@
 module Env.Types
   ( Env( Env, unEnv ), EnvKey( EnvKey ), EnvMod, EnvVal, FromP( fromP )
-  , adjustEnvMod, adjustEnvModT, alterEnvMod, alterEnvModT, clearEnvMod
-  , fromList, fromListT, fromMap, fromMapT, mapf, setEnvMod, setEnvModT, smap
-  , strsEnv, runEnvMod, unKey, unsetEnvMod, unsetEnvModT, updateEnvMod
-  , updateEnvModT
+  , adjustEnvMod, adjustEnvModT
+  , alterEnvMod, alterEnvModT
+  , clearEnvMod, clearEnvModT, clearEnvMod',
+    fromList, fromListT, fromMap, fromMapT, mapf
+  , runEnvMod, runEnvMod'
+  , setEnvMod, setEnvModT
+  , smap, strsEnv
+  , unKey
+  , unsetEnvMod, unsetEnvModT
+  , updateEnvMod, updateEnvModT
 
   , tests
   )
 where
 
-import Control.Monad  ( mapM_ )
-import Control.Monad.State  ( execState, modify )
+import Base1T
 
 -- base --------------------------------
 
-import Control.Applicative     ( many )
+import qualified  Data.List
+
 import Data.Bifunctor          ( bimap )
 import Data.Char               ( isAlphaNum )
-import Data.Eq                 ( Eq )
 import Data.Foldable           ( all, concatMap )
-import Data.Function           ( ($), const, id )
-import Data.Functor            ( fmap )
-import Data.List               ( replicate, reverse )
+import Data.Function           ( flip )
 import Data.Maybe              ( catMaybes )
-import Data.Monoid             ( Monoid( mappend, mconcat, mempty ) )
-import Data.Ord                ( Ord )
-import Data.Semigroup          ( Semigroup( (<>) ) )
+import Data.Monoid             ( Monoid( mappend, mempty ) )
 import Data.String             ( IsString( fromString ) )
+import GHC.Exts                ( IsList( toList ) )
 import GHC.Generics            ( Generic )
-import System.Exit             ( ExitCode )
-import System.IO               ( IO )
-import Text.Show               ( Show )
-
--- base-unicode-symbols ----------------
-
-import Data.Bool.Unicode      ( (∨) )
-import Data.Eq.Unicode        ( (≡) )
-import Data.Foldable.Unicode  ( (∈) )
-import Data.Function.Unicode  ( (∘) )
-import Data.Monoid.Unicode    ( (⊕) )
 
 -- containers --------------------------
 
 import qualified Data.Map  as  Map
+import qualified Data.Set  as Set
 
 -- data-textual ------------------------
 
-import Data.Textual  ( Printable( print ), Textual( textual ), toString )
+import Data.Textual  ( Textual( textual ) )
 
 -- deepseq -----------------------------
 
@@ -56,38 +48,21 @@ import Control.DeepSeq  ( NFData )
 
 import Data.MonoTraversable  ( Element, MonoFunctor( omap ) )
 
--- more-unicode ------------------------
+-- mtl ---------------------------------
 
-import Data.MoreUnicode.Bool     ( 𝔹 )
-import Data.MoreUnicode.Char     ( ℂ )
-import Data.MoreUnicode.Functor  ( (⊳), (⩺) )
-import Data.MoreUnicode.Maybe    ( 𝕄 )
-import Data.MoreUnicode.Natural  ( ℕ )
-import Data.MoreUnicode.String   ( 𝕊 )
+import Control.Monad.State  ( execState, modify )
 
 -- parsers -----------------------------
 
 import Text.Parser.Char  ( anyChar )
 
--- tasty -------------------------------
+-- text --------------------------------
 
-import Test.Tasty  ( TestTree, testGroup )
-
--- tasty-hunit -------------------------
-
-import Test.Tasty.HUnit  ( (@=?), testCase )
-
--- tasty-plus --------------------------
-
-import TastyPlus  ( runTestsP, runTestsReplay, runTestTree )
+import Data.Text  ( pack, replicate, reverse )
 
 -- text-printer ------------------------
 
 import qualified  Text.Printer  as  P
-
--- tfmt --------------------------------
-
-import Text.Fmt  ( fmt, fmtS )
 
 --------------------------------------------------------------------------------
 
@@ -96,37 +71,51 @@ class FromP α where
 
 ------------------------------------------------------------
 
-newtype EnvKey  = EnvKey { unKey ∷ 𝕊 }
+-- things that can usefully have a mapped text function
+class TMap γ where
+  tmap  ∷ (𝕋 → 𝕋) → γ → γ
+  mtmap ∷ (𝕋 → 𝕋) → 𝕄 γ → 𝕄 γ
+  mtmap f = fmap $ tmap f
+
+------------------------------------------------------------
+
+newtype EnvKey = EnvKey { unKey ∷ 𝕋 }
   deriving (Eq,Generic,NFData,Ord,Show)
 
 instance Printable EnvKey where
-  print (EnvKey t) = P.string t
+  print (EnvKey t) = P.text t
 
 instance IsString EnvKey where
-  fromString = EnvKey
+  fromString = EnvKey ∘ pack
 
 instance Textual EnvKey where
-  textual = EnvKey ⊳ many anyChar
+  textual = EnvKey ∘ pack ⊳ many anyChar
 
 instance FromP EnvKey where
   fromP = fromString ∘ toString
 
+instance TMap EnvKey where
+  tmap f = EnvKey ∘ f ∘ unKey
+
 ------------------------------------------------------------
 
-newtype EnvVal  = EnvVal { unVal ∷ 𝕊 }
+newtype EnvVal  = EnvVal { unVal ∷ 𝕋 }
   deriving (Eq,Generic,NFData,Show)
 
 instance Printable EnvVal where
-  print (EnvVal t) = P.string t
+  print (EnvVal t) = P.text t
 
 instance IsString EnvVal where
-  fromString = EnvVal
+  fromString = EnvVal ∘ pack
 
 instance Textual EnvVal where
-  textual = EnvVal ⊳ many anyChar
+  textual = EnvVal ∘ pack ⊳ many anyChar
 
 instance FromP EnvVal where
   fromP = fromString ∘ toString
+
+instance TMap EnvVal where
+  tmap f = EnvVal ∘ f ∘ unVal
 
 ------------------------------------------------------------
 
@@ -165,9 +154,14 @@ fromMapT ∷ (Printable τ, Printable σ) ⇒ Map.Map τ σ → Env
 fromMapT =
   Env ∘ Map.mapKeys (fromString ∘ toString) ∘ Map.map (fromString ∘ toString)
 
-{- | Construct an Env from a list of pairs of (EnvKey,EnvVal). -}
-fromList ∷ [(EnvKey,EnvVal)] → Env
-fromList = fromMap ∘ Map.fromList
+instance IsList Env where
+  type instance Item Env = (EnvKey,EnvVal)
+
+  fromList ∷ [(EnvKey,EnvVal)] → Env
+  fromList = fromMap ∘ Map.fromList
+
+  toList ∷ Env → [(EnvKey,EnvVal)]
+  toList = Map.toList ∘ unEnv
 
 {- | Construct an Env from a list of pairs of (EnvKey,EnvVal). -}
 fromListT ∷ (Ord τ, Printable τ, Printable σ) ⇒ [(τ,σ)] → Env
@@ -190,7 +184,7 @@ instance MonoFunctor Env where
 omapTests ∷ TestTree
 omapTests =
   let f ∷ EnvVal → EnvVal
-      f = fromString ∘ (\ t → t ⊕ reverse t) ∘ toString
+      f = tmap (\ t → t ⊕ reverse t)
    in testGroup "omap"
                 [ testCase "t ++ reverse t" $
                         Env (Map.fromList [("a", "cattac"), ("c", "doggod")])
@@ -219,13 +213,16 @@ mapf f = fromListT ∘ catMaybes ∘ fmap f ∘ strsEnv
 
 ------------------------------------------------------------
 
-data EnvMod = EnvMod [(Env → Env)]
+-- Each element is an environment transformation function, with a description.
+-- The description has no semantic value; it is used purely for logging &
+-- debugging.
+data EnvMod = EnvMod [(𝕋,Env → Env)]
 
 instance Semigroup EnvMod where
   (EnvMod xs) <> (EnvMod ys) = EnvMod (xs ⊕ ys)
 
 instance Monoid EnvMod where
-  mempty  = EnvMod []
+  mempty = EnvMod []
   mappend (EnvMod xs) (EnvMod ys) = EnvMod (xs ⊕ ys)
 
 {- | Clear a key/value from the environment. -}
@@ -234,81 +231,134 @@ unsetEnvMod = unsetEnvModT
 
 {- | Clear a key/value from the environment. -}
 unsetEnvModT ∷ Printable τ ⇒ τ → EnvMod
-unsetEnvModT k = EnvMod [ innerMap $ Map.delete (fromP k) ]
+unsetEnvModT k = let msg = [fmt|env unset '%T'|] k
+                  in EnvMod [ (msg, innerMap $ Map.delete (fromP k)) ]
+
+{- | Set a key to a constant value pair in the environment irrespective of any
+     prior value or lack for that key. -}
+setEnvModT ∷ ∀ τ σ . (Printable τ, Printable σ) ⇒ τ → σ → EnvMod
+setEnvModT k v = let msg = [fmt|env set '%T' to '%T'|] k v
+                  in EnvMod [ (msg, innerMap $ Map.insert (fromP k) (fromP v)) ]
 
 {- | Set a key to a constant value pair in the environment irrespective of any
      prior value or lack for that key. -}
 setEnvMod ∷ EnvKey → EnvVal → EnvMod
 setEnvMod = setEnvModT
 
-{- | Set a key to a constant value pair in the environment irrespective of any
-     prior value or lack for that key. -}
-setEnvModT ∷ (Printable τ, Printable σ) ⇒ τ → σ → EnvMod
-setEnvModT k v =
-  EnvMod [ innerMap $ Map.insert (fromP k) (fromP v) ]
-
-{- | Clear the environment; remove all keys. -}
-clearEnvMod ∷ EnvMod
-clearEnvMod = EnvMod [ innerMap ∘ const $ Map.empty ]
-
-{- | Update or delete the value attached to a key in the environment; no-op for
-     a key that doesn't exist in the environment.. -}
-updateEnvMod ∷ (EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
-updateEnvMod f = updateEnvModT (f ∘ fromString)
-
-{- | Update or delete the value attached to a key in the environment; no-op for
-     a key that doesn't exist in the environment.. -}
-updateEnvModT ∷ (Printable τ, Printable σ) ⇒ (𝕊 → 𝕄 σ) → τ → EnvMod
-updateEnvModT f k =
-  EnvMod [ innerMap $ Map.update (fromP ⩺ f ∘ toString) (fromP k) ]
-
-{- | Update the value attached to a key in the environment; no-op if the key is
-     not in the environment. -}
-adjustEnvMod ∷ (EnvVal → EnvVal) → EnvKey → EnvMod
-adjustEnvMod f = adjustEnvModT (f ∘ fromString)
-
-{- | Update the value attached to a key in the environment; no-op if the key is
-     not in the environment. -}
-adjustEnvModT ∷ (Printable τ, Printable σ) ⇒ (𝕊 → σ) → τ → EnvMod
-adjustEnvModT f k =
-  EnvMod [ innerMap $ Map.adjust (fromP ∘ f ∘ toString) (fromP k) ]
-
 ----------------------------------------
 
-{- | Update or delete the value or non-value attached to a key in the
-     environment. -}
-alterEnvMod ∷ (𝕄 EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
-alterEnvMod f = alterEnvModT (f ∘ fmap fromString)
-
-{- | Update or delete the value or non-value attached to a key in the
-     environment. -}
-alterEnvModT ∷ (Printable τ, Printable σ) ⇒ (𝕄 𝕊 → 𝕄 σ) → τ → EnvMod
-alterEnvModT f k =
-  EnvMod [ innerMap $ Map.alter (fromP ⩺ f ∘ fmap toString) (fromP k) ]
+{- | Clear the environment; remove all keys, except a given set. -}
+clearEnvModT ∷ Printable τ ⇒ Set.Set τ → EnvMod
+clearEnvModT keeps
+  | Set.null keeps = EnvMod [ ("env clear",innerMap ∘ const $ Map.empty) ]
+  | otherwise      =
+      let msg = [fmt|env clear except [%L]|] keeps
+       in EnvMod [(msg,innerMap $ flip Map.restrictKeys (Set.map fromP keeps))]
 
 --------------------
 
-alterEnvModTests ∷ TestTree
-alterEnvModTests =
-  let a = "a" ∷ 𝕊
-   in testGroup "alterEnvMod"
-                [ testCase "id (a)" $ e1 @=? runEnvMod (alterEnvMod id "a") e1
-                , testCase "id (e)" $ e1 @=? runEnvMod (alterEnvMod id "e") e1
-                , testCase "reverse (a)" $
-                        Env (Map.fromList [("a", "tac"), ("c", "dog")])
-                    @=? runEnvMod (alterEnvModT (fmap reverse) a) e1
-                , testCase "reverse (e)" $
-                      e1 @=? runEnvMod (alterEnvModT (fmap reverse) ("e" ∷ 𝕊)) e1
-                , testCase "reverse - replicate (a)" $
-                      Env (Map.fromList [("a", "tactac"), ("c", "dog")])
-                    @=? runEnvMod (  alterEnvModT (fmap reverse) a
-                                   ⊕ alterEnvModT (fmap (mconcat ∘ replicate 2)) a) e1
+{- | Clear the environment; remove all keys, except a given set. -}
+clearEnvMod ∷ Set.Set EnvKey → EnvMod
+clearEnvMod keeps
+  | Set.null keeps = EnvMod [ ("env clear",innerMap ∘ const $ Map.empty) ]
+  | otherwise      = let msg = [fmt|env clear except [%L]|] keeps
+                      in EnvMod [ (msg,innerMap $ flip Map.restrictKeys keeps) ]
+
+----------------------------------------
+
+{- | Clear the environment; remove all keys. -}
+clearEnvMod' ∷ EnvMod
+clearEnvMod' = clearEnvMod Set.empty
+
+--------------------
+
+clearEnvModTests ∷ TestTree
+clearEnvModTests =
+  let a = "a"; c = "c"
+      env = Env ∘ Map.fromList
+      check ∷ TestName → Env → [EnvKey] → TestTree
+      check nm exp ks =
+        testCase nm $ exp @=? runEnvMod (clearEnvMod $ Set.fromList ks) e1
+   in testGroup "clearEnvMod"
+                [ check "clear; keep only c" (env [(c,"dog")]) [c]
+                , check "clear; keep a & c" e1 [a,c]
+                , check "clear; keep none" (env []) []
                 ]
 
 ----------------------------------------
 
-{- | Apply a set of modifications to a Environment -}
-runEnvMod ∷ EnvMod → Env → Env
+{- | Update or delete the value attached to a key in the environment; no-op for
+     a key that doesn't exist in the environment.. -}
+updateEnvModT ∷ ∀ τ σ . (Printable τ, Printable σ) ⇒ 𝕋 → (𝕊 → 𝕄 σ) → τ → EnvMod
+updateEnvModT msg f k =
+  EnvMod [ (msg, innerMap $ Map.update (fromP ⩺ f ∘ toString) (fromP k)) ]
+
+--------------------
+
+{- | Update or delete the value attached to a key in the environment; no-op for
+     a key that doesn't exist in the environment.. -}
+updateEnvMod ∷ 𝕋 → (EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
+updateEnvMod msg f = updateEnvModT msg (f ∘ fromString)
+
+----------------------------------------
+
+{- | Update the value attached to a key in the environment; no-op if the key is
+     not in the environment. -}
+adjustEnvModT ∷ ∀ τ σ . (Printable τ, Printable σ) ⇒ 𝕋 → (𝕊 → σ) → τ → EnvMod
+adjustEnvModT msg f k =
+  EnvMod [ (msg,innerMap $ Map.adjust (fromP ∘ f ∘ toString) (fromP k)) ]
+
+--------------------
+
+{- | Update the value attached to a key in the environment; no-op if the key is
+     not in the environment. -}
+adjustEnvMod ∷ 𝕋 → (EnvVal → EnvVal) → EnvKey → EnvMod
+adjustEnvMod msg f = adjustEnvModT msg (f ∘ fromString)
+
+----------------------------------------
+
+{- | Update or delete the value or non-value attached to a key in the
+     environment. -}
+alterEnvModT ∷ ∀ τ σ .
+               (Printable τ, Printable σ) ⇒ 𝕋 → (𝕄 𝕊 → 𝕄 σ) → τ → EnvMod
+alterEnvModT msg f k =
+  EnvMod [ (msg,innerMap $ Map.alter (fromP ⩺ f ∘ fmap toString) (fromP k)) ]
+
+--------------------
+
+{- | Update or delete the value or non-value attached to a key in the
+     environment. -}
+alterEnvMod ∷ 𝕋 → (𝕄 EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
+alterEnvMod msg f = alterEnvModT msg (f ∘ fmap fromString)
+
+----------
+
+alterEnvModTests ∷ TestTree
+alterEnvModTests =
+  let a = "a"; c = "c"
+      env = Env ∘ Map.fromList
+      check ∷ TestName → Env → (𝕋 → 𝕋) → EnvKey → TestTree
+      check nm exp f k =
+        testCase nm $ exp @=? runEnvMod (alterEnvMod (toText nm) (mtmap f) k) e1
+   in testGroup "alterEnvMod"
+                [ check "id (a)" e1 id a
+                , check "id (e)" e1 id "e"
+                , check "reverse (a)" (env [(a, "tac"), (c, "dog")]) reverse a
+                , check "reverse (e)" e1 reverse "e"
+                , let g = mtmap $ replicate 2
+                      f =  ю [ alterEnvMod "reverse" (mtmap reverse) a
+                             , alterEnvMod "replicate" g a ]
+                   in checkRun "reverse - replicate (a)" f
+                               (env [ (a, "tactac"∷EnvVal)
+                                    , (c, "dog")])
+                ]
+
+----------------------------------------
+
+{- | Apply a set of modifications to a Environment; also return the list of
+     modifications applied as Text descriptions.  Note that those texts are
+     purely informational, must not be programmatically interrogated. -}
+runEnvMod' ∷ EnvMod → Env → (Env,[𝕋])
 -- execState ∷ State s a {- state-passing computation to execute -}
 --                 (EnvMod es) ⤳ (mapM_ modify es)
 --           → s {- initial value -}                                -- Env
@@ -319,7 +369,15 @@ runEnvMod ∷ EnvMod → Env → Env
 -- EnvMod; `mapM_` covers the fact that there are a sequence of them.
 -- There is no extra result to each modification, hence `mapM_` rather than
 -- `mapM` and `execState` rather than `runState`.
-runEnvMod (EnvMod es) s0 = execState (mapM_ modify es) s0
+-- runEnvMod (EnvMod es) s0 = execState (mapM_ modify (snd ⊳ es)) s0
+runEnvMod' (EnvMod es) s0 =
+  let (ts',s') = execState (mapM_ modify [\ (ts,x) → (t:ts,e x) | (t,e) ← es])
+                           ([],s0)
+   in (s',Data.List.reverse ts')
+
+{- | Apply a set of modifications to a Environment -}
+runEnvMod ∷ EnvMod → Env → Env
+runEnvMod e = fst ∘ runEnvMod' e
 
 --------------------------------------------------------------------------------
 --                                   tests                                    --
@@ -328,8 +386,11 @@ runEnvMod (EnvMod es) s0 = execState (mapM_ modify es) s0
 e1 ∷ Env
 e1 = Env $ Map.fromList [("a", "cat"), ("c", "dog")]
 
+checkRun ∷ TestName → EnvMod → Env → TestTree
+checkRun nm mod exp = testCase nm $ exp @=? runEnvMod mod e1
+
 tests ∷ TestTree
-tests = testGroup "Env.Types" [ omapTests, alterEnvModTests ]
+tests = testGroup "Env.Types" [ omapTests, alterEnvModTests, clearEnvModTests ]
 
 ----------------------------------------
 

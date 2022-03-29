@@ -2,41 +2,15 @@ module Env.Error
   ( AsEnvError(..), EnvError, envNoParse, envNoParse_, missingEnv, missingEnv_ )
 where
 
-import Prelude ( )
+import Base1T
 
 -- base --------------------------------
 
-import Control.Exception  ( Exception )
-import Data.Eq            ( Eq )
-import Data.Function      ( ($), id )
-import Data.String        ( String )
-import Data.Typeable      ( TypeRep )
-import Text.Show          ( Show )
-
--- base-unicode-symbols ----------------
-
-import Data.Function.Unicode  ( (∘) )
-
--- data-textual ------------------------
-
-import Data.Textual  ( Printable( print ) )
-
--- lens --------------------------------
-
-import Control.Lens.Prism    ( Prism' )
-import Control.Lens.Review   ( (#) )
-
--- mtl ---------------------------------
-
-import Control.Monad.Except  ( MonadError, throwError )
+import Data.Typeable  ( TypeRep )
 
 -- text-printer ------------------------
 
 import qualified  Text.Printer  as  P
-
--- tfmt --------------------------------
-
-import Text.Fmt  ( fmt )
 
 ------------------------------------------------------------
 --                     local imports                      --
