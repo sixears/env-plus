@@ -346,8 +346,8 @@ alterEnvModTests =
                 , check "reverse (a)" (env [(a, "tac"), (c, "dog")]) reverse a
                 , check "reverse (e)" e1 reverse "e"
                 , let g = mtmap $ replicate 2
-                      f =  ю [ alterEnvMod "reverse" (mtmap reverse) a
-                             , alterEnvMod "replicate" g a ]
+                      f = alterEnvMod "reverse" (mtmap reverse) a
+                        ⊕ alterEnvMod "replicate" g a
                    in checkRun "reverse - replicate (a)" f
                                (env [ (a, "tactac"∷EnvVal)
                                     , (c, "dog")])

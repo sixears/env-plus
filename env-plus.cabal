@@ -7,7 +7,7 @@ name:                env-plus
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             1.0.4.0
+version:             1.0.5.0
 
 -- A short (one-line) description of the package.
 synopsis:            Utilities for working with the system environment
@@ -60,9 +60,11 @@ library
                      , LambdaCase
                      , MultiParamTypeClasses
                      , NoImplicitPrelude
+                     , OverloadedLists
                      , OverloadedStrings
                      , QuasiQuotes
                      , RankNTypes
+                     , TupleSections
                      , TypeFamilies
                      , UnicodeSyntax
 
@@ -74,6 +76,7 @@ library
                      , mono-traversable, mtl, parsers, text, text-printer, unix
 
                      , base1t        >= 0.0.3.0
+                     , tasty-plus    >= 1.5.1.0
                      , tfmt          >= 0.2.4.1
 
   -- Directories containing source files.

@@ -1,3 +1,7 @@
+1.0.5.0 2022-03-30
+==================
+- replace withEnv with withEnvMod
+
 1.0.4.0 2022-03-29
 ==================
 - Add text descriptions to EnvMod

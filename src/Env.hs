@@ -2,6 +2,8 @@ module Env
   ( adjustEnv, adjustEnvT, alterEnv, alterEnvT, clearEnv, getEnv, getEnvT
   , getEnvironment, setEnv, setEnvT, setEnvironment, unsetEnv, unsetEnvT
   , updateEnv, updateEnvT, withEnv
+
+  , tests
   )
 where
 
@@ -12,6 +14,19 @@ import Base1T
 import Control.Exception.Base  ( bracket )
 import Data.String             ( fromString )
 
+-- containers --------------------------
+
+import qualified  Data.Set
+
+-- lens --------------------------------
+
+import Control.Lens.Getter  ( view )
+import Control.Lens.Tuple   ( _1 )
+
+-- tasty-plus --------------------------
+
+import TastyPlus  ( ioTests )
+
 -- unix --------------------------------
 
 import qualified System.Posix.Env  as  PosixEnv
@@ -20,8 +35,8 @@ import qualified System.Posix.Env  as  PosixEnv
 --                     local imports                      --
 ------------------------------------------------------------
 
-import Env.Types  ( Env, EnvKey, EnvMod, EnvVal
-                  , fromListT, fromP, strsEnv, runEnvMod )
+import Env.Types  ( Env, EnvKey, EnvMod, EnvVal, clearEnvMod, fromListT, fromP
+                  , setEnvMod, strsEnv, runEnvMod' )
 
 --------------------------------------------------------------------------------
 
@@ -106,11 +121,76 @@ adjustEnvT f k = getEnv (fromP k) ≫ \ case
 clearEnv ∷ MonadIO μ ⇒ μ ()
 clearEnv = liftIO PosixEnv.clearEnv
 
+{- | Perform IO in an environment subject to a set of modifications.
+     Return the IO result, along with a set of log messages describing the
+     environment modification (note: these are purely informational, no specific
+     semantic must be inferred) and the actual environment used for the IO.
+ -}
+withEnvMod ∷ MonadIO μ ⇒ EnvMod → IO α → μ (α,[𝕋],Env)
+withEnvMod m io = liftIO $ do
+  let editEnv = do env ← getEnvironment
+                   let (ioEnv,msgs) = runEnvMod' m env
+                   setEnvironment ioEnv
+                   return (env,msgs,ioEnv)
+  bracket editEnv (setEnvironment ∘ view _1)
+                  (\ (_,msgs,e) → io ≫ return ∘ (,msgs,e))
+
+withEnvModTests ∷ TestTree
+withEnvModTests =
+  let home     = "HOME"
+      nonesuch = "/home/nonesuch"
+      modEnv   = setEnvMod "HOME" nonesuch
+               ⊕ clearEnvMod (Data.Set.fromList [ home ])
+      msgs     = [ "env set 'HOME' to '/home/nonesuch'"
+                 , "env clear except [HOME]" ]
+   in testGroup "withEnv…" $
+      [ ioTests "withEnv"
+                [ ("get HOME (pre)", \ h → getEnv home ≫ (@=? h))
+                , ("set HOME", const $
+                      withEnv modEnv getEnvironment ≫ (@=? [(home,nonesuch)]))
+                , ("get HOME (post)", \ h → getEnv home ≫ (@=? h))
+                ]
+                (getEnv home)
+      , ioTests "withEnvMod"
+                [ ("get HOME (pre)", \ h → getEnv home ≫ (@=? h))
+                , ("set HOME", const $
+                      withEnvMod modEnv getEnvironment ≫ \ (env,msgs',e) → do
+                        (([(home,nonesuch)]) @=? env)
+                        msgs @=? msgs'
+                        e @=? [(home,nonesuch)]
+                  )
+                , ("get HOME (post)", \ h → getEnv home ≫ (@=? h))
+                ]
+                (getEnv home)
+      ]
+
+{-# DEPRECATED withEnv "use `withEnvMod` instead" #-}
 withEnv ∷ MonadIO μ ⇒ EnvMod → IO α → μ α
-withEnv m io = liftIO $ do
+withEnv m io = {- liftIO $ do
   let editEnv = do env ← getEnvironment
                    setEnvironment (runEnvMod m env)
                    return env
-  bracket editEnv setEnvironment (const io)
+  bracket editEnv setEnvironment (const io) -}
+  view _1 ⊳ withEnvMod m io
+
+--------------------------------------------------------------------------------
+--                                   tests                                    --
+--------------------------------------------------------------------------------
+
+tests ∷ TestTree
+tests = testGroup "Env" [ withEnvModTests ]
+
+----------------------------------------
+
+_test ∷ IO ExitCode
+_test = runTestTree tests
+
+--------------------
+
+_tests ∷ 𝕊 → IO ExitCode
+_tests = runTestsP tests
+
+_testr ∷ 𝕊 → ℕ → IO ExitCode
+_testr = runTestsReplay tests
 
 -- that's all, folks! ----------------------------------------------------------
