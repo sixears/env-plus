@@ -1,3 +1,11 @@
+1.0.6.1 2022-04-06
+==================
+- update base1t to 0.0.4.0; remove explicit dependency on tfmt
+
+1.0.6.0 2022-04-04
+==================
+- add MkEnvModFrag, mkEnvModFrag, preclearEnvMod
+
 1.0.5.0 2022-03-30
 ==================
 - replace withEnv with withEnvMod

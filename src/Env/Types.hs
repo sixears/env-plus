@@ -11,6 +11,12 @@ module Env.Types
   , unsetEnvMod, unsetEnvModT
   , updateEnvMod, updateEnvModT
 
+  , EnvModFrag, MkEnvModFrag(..)
+  , ә, ӛ
+  , preclearEnvMod, ҙ
+  , retainKey, ӭ
+  , mkEnvModFrag, э
+
   , tests
   )
 where
@@ -218,6 +224,9 @@ mapf f = fromListT ∘ catMaybes ∘ fmap f ∘ strsEnv
 -- debugging.
 data EnvMod = EnvMod [(𝕋,Env → Env)]
 
+instance Show EnvMod where
+  show (EnvMod m) = [fmt|%L|] (fst ⊳ m)
+
 instance Semigroup EnvMod where
   (EnvMod xs) <> (EnvMod ys) = EnvMod (xs ⊕ ys)
 
@@ -378,6 +387,83 @@ runEnvMod' (EnvMod es) s0 =
 {- | Apply a set of modifications to a Environment -}
 runEnvMod ∷ EnvMod → Env → Env
 runEnvMod e = fst ∘ runEnvMod' e
+
+----------------------------------------
+
+data DiscardOnPreclear = DiscardOnPreclear | NoDiscardOnPreclear
+  deriving (Eq,Show)
+
+data EnvModFrag = EnvModFrag { _envMod ∷ EnvMod
+                             , _envKey ∷ EnvKey
+                             , _discard ∷ DiscardOnPreclear
+                             }
+
+{- | Easy creation of simple env mods by type. -}
+class MkEnvModFrag α where
+  mkEnvMod ∷ α → EnvMod
+  envModKey ∷ α → EnvKey
+
+mkEnvModFrag ∷ MkEnvModFrag α ⇒ α → EnvModFrag
+mkEnvModFrag a = EnvModFrag (mkEnvMod a) (envModKey a) NoDiscardOnPreclear
+
+э ∷ MkEnvModFrag α ⇒ α → EnvModFrag
+э = mkEnvModFrag
+
+instance (Printable τ, Printable ν) ⇒ MkEnvModFrag (τ,ν) where
+  mkEnvMod (k,v) = setEnvModT k v
+  envModKey (k,_) = fromP k
+-- can't use Printable τ ⇒ MkEnvModFrag τ here; as that would be Undecidable
+instance MkEnvModFrag EnvKey where
+  mkEnvMod k = unsetEnvMod k
+  envModKey k = k
+instance (Printable τ, Printable ν) ⇒ MkEnvModFrag (𝕋,τ,𝕊 → ν) where
+  mkEnvMod (msg,k,f) = adjustEnvModT msg f k
+  envModKey (_,k,_) = fromP k
+instance (Printable τ, Printable ν) ⇒ MkEnvModFrag (𝕋,τ,𝕄 𝕊 → 𝕄 ν) where
+  mkEnvMod (msg,k,f) = alterEnvModT msg f k
+  envModKey (_,k,_) = fromP k
+
+----------------------------------------
+
+retainKey ∷ EnvKey → EnvModFrag
+retainKey k =
+  EnvModFrag (adjustEnvMod ([fmt|retain key '%T'|] k) id k) k DiscardOnPreclear
+
+ӭ  ∷ EnvKey → EnvModFrag
+ӭ = retainKey
+
+----------------------------------------
+
+{- | Create an `EnvKey` from a `𝕋`. -}
+ә ∷ 𝕋 → EnvKey
+ә = EnvKey
+
+----------------------------------------
+
+{- | Create an `EnvVal` from a `𝕋`. -}
+ӛ ∷ 𝕋 → EnvVal
+ӛ = EnvVal
+
+-- t = э (ә "HOME",ӛ "/home") ⊕ э ("msg"∷𝕋, ә "FOO", \ (e ∷ 𝕄 𝕊) → e ⊕ e)
+
+----------------------------------------
+
+{- | Construct an EnvMod that is the `mconcat` of a set of envmods; with the
+     environment otherwise cleared of all keys.
+
+     To retain a key without amending it; use @ӭ "KEY"@.
+-}
+preclearEnvMod ∷ [EnvModFrag] → EnvMod
+preclearEnvMod fs = ю ([_envMod f | f ← fs, NoDiscardOnPreclear ≡ (_discard f)])
+                    -- we keep even 'unset's in the list of keys to ignore;
+                    -- because we would otherwise have to check for 'set's &
+                    -- 'adjust's later in the list : clearly possible, but
+                    -- probably not worth the bother at this time
+                  ⊕ clearEnvMod (Set.fromList $ _envKey ⊳ fs)
+
+
+ҙ ∷ [EnvModFrag] → EnvMod
+ҙ = preclearEnvMod
 
 --------------------------------------------------------------------------------
 --                                   tests                                    --
