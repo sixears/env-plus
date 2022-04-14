@@ -1,3 +1,9 @@
+1.0.7.0 2022-04-14
+==================
+- replace internal shell_quote with tfmt %q
+- use EnvKeySet for envmods
+- add tests for envmods
+
 1.0.6.1 2022-04-06
 ==================
 - update base1t to 0.0.4.0; remove explicit dependency on tfmt

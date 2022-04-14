@@ -35,8 +35,8 @@ import qualified System.Posix.Env  as  PosixEnv
 --                     local imports                      --
 ------------------------------------------------------------
 
-import Env.Types  ( Env, EnvKey, EnvMod, EnvVal, clearEnvMod, fromListT, fromP
-                  , setEnvMod, strsEnv, runEnvMod' )
+import Env.Types  ( Env, EnvKey, EnvMod, EnvVal, ә, clearEnvMod, fromListT
+                  , fromP, setEnvMod, strsEnv, runEnvMod' )
 
 --------------------------------------------------------------------------------
 
@@ -139,9 +139,9 @@ withEnvModTests ∷ TestTree
 withEnvModTests =
   let home     = "HOME"
       nonesuch = "/home/nonesuch"
-      modEnv   = setEnvMod "HOME" nonesuch
+      modEnv   = setEnvMod (ә "HOME") nonesuch
                ⊕ clearEnvMod (Data.Set.fromList [ home ])
-      msgs     = [ "env set 'HOME' to '/home/nonesuch'"
+      msgs     = [ "env set [HOME] to '/home/nonesuch'"
                  , "env clear except [HOME]" ]
    in testGroup "withEnv…" $
       [ ioTests "withEnv"

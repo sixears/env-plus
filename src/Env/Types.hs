@@ -12,9 +12,9 @@ module Env.Types
   , updateEnvMod, updateEnvModT
 
   , EnvModFrag, MkEnvModFrag(..)
-  , ә, ӛ
+  , ә, ӛ, ֆ
   , preclearEnvMod, ҙ
-  , retainKey, ӭ
+  , retainKey, retainKeys, ӭ
   , mkEnvModFrag, э
 
   , tests
@@ -27,20 +27,18 @@ import Base1T
 
 import qualified  Data.List
 
-import Data.Bifunctor          ( bimap )
-import Data.Char               ( isAlphaNum )
-import Data.Foldable           ( all, concatMap )
-import Data.Function           ( flip )
-import Data.Maybe              ( catMaybes )
-import Data.Monoid             ( Monoid( mappend, mempty ) )
-import Data.String             ( IsString( fromString ) )
-import GHC.Exts                ( IsList( toList ) )
-import GHC.Generics            ( Generic )
+import Data.Bifunctor  ( bimap )
+import Data.Function   ( flip )
+import Data.Maybe      ( catMaybes )
+import Data.Monoid     ( Monoid( mappend, mempty ) )
+import Data.String     ( IsString( fromString ) )
+import GHC.Exts        ( IsList( toList ) )
+import GHC.Generics    ( Generic )
 
 -- containers --------------------------
 
 import qualified Data.Map  as  Map
-import qualified Data.Set  as Set
+import qualified Data.Set  as  Set
 
 -- data-textual ------------------------
 
@@ -128,28 +126,11 @@ instance TMap EnvVal where
 -- I dislike using a List of Pairs here, as then `getEnv ∘ setEnv` is not `id`
 -- in general (i.e., in the presence of duplicate keys, or differing sorts)
 newtype Env = Env { unEnv ∷ Map.Map EnvKey EnvVal }
-  deriving (Eq,Generic,NFData,Show)
-
-shell_quote ∷ 𝕊 → 𝕊
-shell_quote s =
-  let is_safe ∷ ℂ → 𝔹
-      is_safe c = '_' ≡ c ∨ isAlphaNum c
-      quote_char ∷ ℂ → 𝕊
-      quote_char c = if isAlphaNum c
-                     then [c]
-                     else if '_' ≡ c
-                          then [c]
-                          else "\\" ⊕ [c]
-  in if all is_safe s
-     then s
-     else if '\'' ∈ s
-          then concatMap quote_char s
-          else "'" ⊕ s ⊕ "'"
+  deriving (Eq,Generic,Monoid,NFData,Semigroup,Show)
 
 instance Printable Env where
   print e =
-    P.text $ let qu = shell_quote
-              in [fmt|[%L]|] [ [fmtS|%s=%s|] (qu k) (qu v) | (k,v) ← strsEnv e ]
+    P.text $ [fmt|[%L]|] [ [fmtS|%q=%q|] k v | (k,v) ← strsEnv e ]
 
 {- | Construct an Env from a Map from EnvKeys to EnvVals. -}
 fromMap ∷ Map.Map EnvKey EnvVal → Env
@@ -234,25 +215,33 @@ instance Monoid EnvMod where
   mempty = EnvMod []
   mappend (EnvMod xs) (EnvMod ys) = EnvMod (xs ⊕ ys)
 
-{- | Clear a key/value from the environment. -}
-unsetEnvMod ∷ EnvKey → EnvMod
-unsetEnvMod = unsetEnvModT
+------------------------------------------------------------
+
+{- | Clear some keys from the environment. -}
+unsetEnvMod ∷ EnvKeySet α ⇒ α → EnvMod
+unsetEnvMod = unsetEnvModT ∘ envKeySet
 
 {- | Clear a key/value from the environment. -}
-unsetEnvModT ∷ Printable τ ⇒ τ → EnvMod
-unsetEnvModT k = let msg = [fmt|env unset '%T'|] k
-                  in EnvMod [ (msg, innerMap $ Map.delete (fromP k)) ]
+unsetEnvModT ∷ (Printable τ, Ord τ) ⇒ Set.Set τ → EnvMod
+unsetEnvModT (Set.map fromP → ks) =
+  let msg = [fmt|env unset [%L]|] [[fmtT|%q|] x | x ← Set.toList ks]
+   in EnvMod [ (msg, innerMap $ flip Map.withoutKeys ks) ]
+
+----------------------------------------
 
 {- | Set a key to a constant value pair in the environment irrespective of any
      prior value or lack for that key. -}
-setEnvModT ∷ ∀ τ σ . (Printable τ, Printable σ) ⇒ τ → σ → EnvMod
-setEnvModT k v = let msg = [fmt|env set '%T' to '%T'|] k v
-                  in EnvMod [ (msg, innerMap $ Map.insert (fromP k) (fromP v)) ]
+setEnvModT ∷ ∀ τ σ . (Printable τ, Printable σ) ⇒ Set.Set τ → σ → EnvMod
+setEnvModT (Set.map fromP → ks) v =
+  let msg = [fmt|env set [%L] to '%T'|] ([[fmtT|%q|] x | x ← Set.toList ks]) v
+   in EnvMod [ (msg, innerMap $ Map.union (Map.fromSet (const (fromP v)) ks)) ]
+
+--------------------
 
 {- | Set a key to a constant value pair in the environment irrespective of any
      prior value or lack for that key. -}
-setEnvMod ∷ EnvKey → EnvVal → EnvMod
-setEnvMod = setEnvModT
+setEnvMod ∷ EnvKeySet α ⇒ α → EnvVal → EnvMod
+setEnvMod = setEnvModT ∘ envKeySet
 
 ----------------------------------------
 
@@ -298,47 +287,50 @@ clearEnvModTests =
 
 {- | Update or delete the value attached to a key in the environment; no-op for
      a key that doesn't exist in the environment.. -}
-updateEnvModT ∷ ∀ τ σ . (Printable τ, Printable σ) ⇒ 𝕋 → (𝕊 → 𝕄 σ) → τ → EnvMod
-updateEnvModT msg f k =
-  EnvMod [ (msg, innerMap $ Map.update (fromP ⩺ f ∘ toString) (fromP k)) ]
+updateEnvModT ∷ ∀ τ σ .
+                (Printable τ, Printable σ) ⇒ 𝕋 → (𝕊 → 𝕄 σ) → Set.Set τ → EnvMod
+updateEnvModT msg f (Set.toList → ks) =
+  EnvMod [ (msg, innerMap $ Map.update (fromP ⩺ f ∘ toString) (fromP k)) | k←ks]
 
 --------------------
 
 {- | Update or delete the value attached to a key in the environment; no-op for
      a key that doesn't exist in the environment.. -}
-updateEnvMod ∷ 𝕋 → (EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
-updateEnvMod msg f = updateEnvModT msg (f ∘ fromString)
+updateEnvMod ∷ EnvKeySet α ⇒ 𝕋 → (EnvVal → 𝕄 EnvVal) → α → EnvMod
+updateEnvMod msg f = updateEnvModT msg (f ∘ fromString) ∘ envKeySet
 
 ----------------------------------------
 
 {- | Update the value attached to a key in the environment; no-op if the key is
      not in the environment. -}
-adjustEnvModT ∷ ∀ τ σ . (Printable τ, Printable σ) ⇒ 𝕋 → (𝕊 → σ) → τ → EnvMod
-adjustEnvModT msg f k =
-  EnvMod [ (msg,innerMap $ Map.adjust (fromP ∘ f ∘ toString) (fromP k)) ]
+adjustEnvModT ∷ ∀ τ σ .
+                (Printable τ, Printable σ) ⇒ 𝕋 → (𝕊 → σ) → Set.Set τ → EnvMod
+adjustEnvModT msg f (Set.toList → ks) =
+  EnvMod [ (msg,innerMap $ Map.adjust (fromP ∘ f ∘ toString) (fromP k)) | k←ks ]
 
 --------------------
 
 {- | Update the value attached to a key in the environment; no-op if the key is
      not in the environment. -}
-adjustEnvMod ∷ 𝕋 → (EnvVal → EnvVal) → EnvKey → EnvMod
-adjustEnvMod msg f = adjustEnvModT msg (f ∘ fromString)
+adjustEnvMod ∷ EnvKeySet α ⇒ 𝕋 → (EnvVal → EnvVal) → α → EnvMod
+adjustEnvMod msg f = adjustEnvModT msg (f ∘ fromString) ∘ envKeySet
 
 ----------------------------------------
 
 {- | Update or delete the value or non-value attached to a key in the
      environment. -}
-alterEnvModT ∷ ∀ τ σ .
-               (Printable τ, Printable σ) ⇒ 𝕋 → (𝕄 𝕊 → 𝕄 σ) → τ → EnvMod
-alterEnvModT msg f k =
-  EnvMod [ (msg,innerMap $ Map.alter (fromP ⩺ f ∘ fmap toString) (fromP k)) ]
+alterEnvModT ∷ ∀ τ σ . (Printable τ, Printable σ) ⇒
+               𝕋 → (𝕄 𝕊 → 𝕄 σ) → Set.Set τ → EnvMod
+alterEnvModT msg f (Set.toList → ks) =
+  EnvMod [ (msg,innerMap $ Map.alter (fmap fromP ∘ f ∘ fmap toString) (fromP k))
+         | k ← ks ]
 
 --------------------
 
 {- | Update or delete the value or non-value attached to a key in the
      environment. -}
-alterEnvMod ∷ 𝕋 → (𝕄 EnvVal → 𝕄 EnvVal) → EnvKey → EnvMod
-alterEnvMod msg f = alterEnvModT msg (f ∘ fmap fromString)
+alterEnvMod ∷ EnvKeySet α ⇒ 𝕋 → (𝕄 EnvVal → 𝕄 EnvVal) → α → EnvMod
+alterEnvMod msg f = alterEnvModT msg (f ∘ fmap fromString) ∘ envKeySet
 
 ----------
 
@@ -390,47 +382,49 @@ runEnvMod e = fst ∘ runEnvMod' e
 
 ----------------------------------------
 
+{- | Single instruction to modify the environment in a simple way, such that
+     these instructions may be concatenated and applied to a pre-existing env.
+ -}
 data DiscardOnPreclear = DiscardOnPreclear | NoDiscardOnPreclear
   deriving (Eq,Show)
 
-data EnvModFrag = EnvModFrag { _envMod ∷ EnvMod
-                             , _envKey ∷ EnvKey
+data EnvModFrag = EnvModFrag { _envMod  ∷ EnvMod
+                             , _envKeys ∷ Set.Set EnvKey
                              , _discard ∷ DiscardOnPreclear
                              }
 
-{- | Easy creation of simple env mods by type. -}
-class MkEnvModFrag α where
-  mkEnvMod ∷ α → EnvMod
-  envModKey ∷ α → EnvKey
+------------------------------------------------------------
 
-mkEnvModFrag ∷ MkEnvModFrag α ⇒ α → EnvModFrag
-mkEnvModFrag a = EnvModFrag (mkEnvMod a) (envModKey a) NoDiscardOnPreclear
+{-| Things that may be converted to a set of `EnvKey`s -}
 
-э ∷ MkEnvModFrag α ⇒ α → EnvModFrag
-э = mkEnvModFrag
+class EnvKeySet α where
+  envKeySet ∷ α → Set.Set EnvKey
+  ekList ∷ α → [EnvKey]
+  ekList = Set.toList ∘ envKeySet
 
-instance (Printable τ, Printable ν) ⇒ MkEnvModFrag (τ,ν) where
-  mkEnvMod (k,v) = setEnvModT k v
-  envModKey (k,_) = fromP k
--- can't use Printable τ ⇒ MkEnvModFrag τ here; as that would be Undecidable
-instance MkEnvModFrag EnvKey where
-  mkEnvMod k = unsetEnvMod k
-  envModKey k = k
-instance (Printable τ, Printable ν) ⇒ MkEnvModFrag (𝕋,τ,𝕊 → ν) where
-  mkEnvMod (msg,k,f) = adjustEnvModT msg f k
-  envModKey (_,k,_) = fromP k
-instance (Printable τ, Printable ν) ⇒ MkEnvModFrag (𝕋,τ,𝕄 𝕊 → 𝕄 ν) where
-  mkEnvMod (msg,k,f) = alterEnvModT msg f k
-  envModKey (_,k,_) = fromP k
+instance EnvKeySet (Set.Set EnvKey) where
+  envKeySet = id
 
-----------------------------------------
+instance EnvKeySet [EnvKey] where
+  envKeySet = Set.fromList
+
+instance EnvKeySet EnvKey where
+  envKeySet = Set.singleton
+
+------------------------------------------------------------
 
 retainKey ∷ EnvKey → EnvModFrag
 retainKey k =
-  EnvModFrag (adjustEnvMod ([fmt|retain key '%T'|] k) id k) k DiscardOnPreclear
+  let ks = Set.singleton k
+      msg = [fmt|retain key '%T'|] k
+   in EnvModFrag (adjustEnvMod msg id ks) ks DiscardOnPreclear
 
-ӭ  ∷ EnvKey → EnvModFrag
-ӭ = retainKey
+retainKeys ∷ EnvKeySet α ⇒ α → EnvModFrag
+retainKeys ks = EnvModFrag (adjustEnvMod ([fmt|retain key '%L'|] $ ekList ks)
+                           id (ekList ks)) (envKeySet ks) DiscardOnPreclear
+
+ӭ  ∷ EnvKeySet α ⇒ α → EnvModFrag
+ӭ = retainKeys
 
 ----------------------------------------
 
@@ -459,11 +453,124 @@ preclearEnvMod fs = ю ([_envMod f | f ← fs, NoDiscardOnPreclear ≡ (_discard
                     -- because we would otherwise have to check for 'set's &
                     -- 'adjust's later in the list : clearly possible, but
                     -- probably not worth the bother at this time
-                  ⊕ clearEnvMod (Set.fromList $ _envKey ⊳ fs)
+                  ⊕ clearEnvMod (Set.unions $ _envKeys ⊳ fs)
 
 
+----------
+
+{-| Alias for `preclearEnvMod` -}
 ҙ ∷ [EnvModFrag] → EnvMod
 ҙ = preclearEnvMod
+
+------------------------------------------------------------
+
+{- | Easy creation of simple env mods by type. -}
+class MkEnvModFrag α where
+  mkEnvMod   ∷ α → EnvMod
+  envModKeys ∷ α → Set.Set EnvKey
+
+mkEnvModFrag ∷ MkEnvModFrag α ⇒ α → EnvModFrag
+mkEnvModFrag a = EnvModFrag (mkEnvMod a) (envModKeys a) NoDiscardOnPreclear
+
+э ∷ MkEnvModFrag α ⇒ α → EnvModFrag
+э = mkEnvModFrag
+
+ֆ ∷ Ord α ⇒ [α] → Set.Set α
+ֆ = Set.fromList
+
+--------------------
+
+{-| @э (EnvKeySet,EnvVal) @ - set -}
+
+instance MkEnvModFrag (Set.Set EnvKey, EnvVal) where
+  mkEnvMod (ks,v)   = setEnvMod ks v
+  envModKeys (ks,_) = ks
+
+--------------------
+
+{-| @э EnvKeySet@ - unset -}
+
+-- can't use EnvKeySet α ⇒ MkEnvModFrag α here; as that would be Undecidable
+instance MkEnvModFrag (Set.Set EnvKey) where
+  mkEnvMod ks = unsetEnvMod ks
+  envModKeys  = id
+
+--------------------
+
+-- can't use Printable τ ⇒ MkEnvModFrag τ here; as that would be Undecidable
+instance MkEnvModFrag EnvKey where
+  mkEnvMod   k = unsetEnvMod k
+  envModKeys k = Set.singleton k
+
+--------------------
+
+{-| @э (𝕋,EnvKeySet,𝕊→Printable)@ - msg,key,function - update  -}
+
+instance (EnvKeySet α, Printable τ) ⇒ MkEnvModFrag (𝕋,α,𝕊 → 𝕄 τ) where
+  mkEnvMod (msg,ks,f) = updateEnvModT msg f (envKeySet ks)
+  envModKeys (_,ks,_) = envKeySet ks
+
+--------------------
+
+{-| @э (𝕋,EnvKeySet,𝕊→Printable)@ - msg,key,function - adjust  -}
+
+instance (EnvKeySet α, Printable τ) ⇒ MkEnvModFrag (𝕋,α,𝕊 → τ) where
+  mkEnvMod (msg,ks,f) = adjustEnvModT msg f (envKeySet ks)
+  envModKeys (_,ks,_) = envKeySet ks
+
+--------------------
+
+
+{-| @э (𝕋,EnvKeySet,𝕄 𝕊→𝕄 Printable)@ - msg,key,function - alter  -}
+
+instance (EnvKeySet α, Printable τ) ⇒ MkEnvModFrag (𝕋,α,𝕄 𝕊 → 𝕄 τ) where
+  mkEnvMod (msg,ks,f) = alterEnvModT msg f (envKeySet ks)
+  envModKeys (_,ks,_) = envKeySet ks
+
+ѯ ∷ [EnvModFrag] → Env → Env
+ѯ frags = runEnvMod (ҙ frags)
+
+mkEnvModFragTests ∷ TestTree
+mkEnvModFragTests =
+  testGroup "MkEnvModFrag" $
+    let set   = э (ֆ [ә"A","b"], ӛ "v1")
+        unset = э (ֆ [ә"A","b"])
+        env0  = Env [("A","v1") ]
+        env0' = Env [("b","v1") ]
+        env1  = Env [("A","v1"),("b","v1")]
+        env2  = Env [("A","v1"),("c","v2")]
+        env3  = Env [("A","v1"),("b","v1"),("c","v2")]
+     in [ testCase "base case (empty)" $ ф @=? (ѯ []) ф
+          -- remember!  preclearEnvMod (ҙ) empties the environment of any keys
+          -- that are not explicitly retained
+        , testCase "base case (env1)" $ ф @=? (ѯ []) env1
+        , testCase "retain A" $ env0 @=? (ѯ $ [ӭ $ ֆ [ә "A"]]) env1
+        , testCase "retain A,c" $ env2 @=? (ѯ $ [ӭ $ ֆ [ә "A",ә "c"]]) env3
+        , testCase "retain A,b,c" $ env3 @=? (ѯ $ [ӭ $ ֆ [ә"A",ә"b",ә"c"]]) env3
+        , testCase "set keys" $ Set.fromList [ "A", "b" ] @=? _envKeys set
+        , testCase "set" $ env1 @=? (ѯ [set]) ф
+        , testCase "unset keys" $ Set.fromList [ "A", "b" ] @=? _envKeys unset
+        , testCase "retain all;unset b" $
+            env2 @=? (ѯ [ӭ $ ֆ [ә"A",ә"b",ә"c"],э $ ֆ [ә "b"]]) env3
+        , testCase "retain all;unset A,c" $
+            env0' @=? (ѯ [ӭ $ ֆ [ә"A",ә"b",ә"c"],э $ ֆ [ә"A",ә"c"]]) env3
+        , testCase "retain A,b;unset b" $
+            env0 @=? (ѯ [ӭ $ ֆ [ә"A",ә"b"],э $ ֆ [ә "b"]]) env3
+        , testCase "unset b;retain all" $
+            env2 @=? (ѯ [ӭ $ ֆ [ә"A",ә"b",ә"c"],э $ ֆ [ә "b"]]) env3
+        , testCase "unset b;retain A,b" $
+            env0 @=? (ѯ [ӭ $ ֆ [ә"A",ә"b"],э $ ֆ [ә "b"]]) env3
+        , testCase "set A,b; adjust A" $
+            Env [("A","v3v3"), ("b","v3")] @=? (ѯ [ э (ֆ [ә"A",ә"b"],ӛ"v3")
+                                                  , э (("x"∷𝕋,ֆ [ә "A", ә "a"],
+                                                        \ (v∷𝕊) → v⊕v))
+                                                  ]) env3
+        , testCase "adjust A; set A,b" $
+            Env [("A","v3"), ("b","v3")] @=? (ѯ [ э (("x"∷𝕋,ֆ [ә "A", ә "a"],
+                                                      \ (v∷𝕊) → v⊕v))
+                                                , э (ֆ [ә"A",ә"b"],ӛ"v3")
+                                                ]) env3
+        ]
 
 --------------------------------------------------------------------------------
 --                                   tests                                    --
@@ -476,7 +583,8 @@ checkRun ∷ TestName → EnvMod → Env → TestTree
 checkRun nm mod exp = testCase nm $ exp @=? runEnvMod mod e1
 
 tests ∷ TestTree
-tests = testGroup "Env.Types" [ omapTests, alterEnvModTests, clearEnvModTests ]
+tests = testGroup "Env.Types" [ omapTests, alterEnvModTests, clearEnvModTests
+                              , mkEnvModFragTests ]
 
 ----------------------------------------
 
@@ -492,3 +600,4 @@ _testr ∷ 𝕊 → ℕ → IO ExitCode
 _testr = runTestsReplay tests
 
 -- that's all, folks! ----------------------------------------------------------
+
