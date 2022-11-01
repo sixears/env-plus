@@ -1,3 +1,8 @@
+1.0.7.1 2022-11-01
+==================
+- add flake
+- use ghc-8.10.7 for tfmt
+
 1.0.7.0 2022-04-14
 ==================
 - replace internal shell_quote with tfmt %q
