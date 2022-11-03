@@ -5,7 +5,7 @@
     nixpkgs.url      = "github:nixos/nixpkgs/be44bf67"; # nixos-22.05 2022-10-15
     build-utils.url  = "github:sixears/flake-build-utils/r1.0.0.5";
 
-    base1t.url       = "github:sixears/base1t/r0.0.5.6";
+    base1t.url       = "github:sixears/base1t/r0.0.5.7";
     tasty-plus.url   = "github:sixears/tasty-plus/r1.5.2.6";
   };
 
