@@ -5,8 +5,8 @@
     nixpkgs.url      = github:nixos/nixpkgs/be44bf67; # nixos-22.05 2022-10-15
     build-utils.url  = github:sixears/flake-build-utils/r1.0.0.13;
 
-    base1t.url       = github:sixears/base1t/r0.0.5.33;
-    tasty-plus.url   = github:sixears/tasty-plus/r1.5.2.21;
+    base1t.url       = github:sixears/base1t/r0.0.5.34;
+    tasty-plus.url   = github:sixears/tasty-plus/r1.5.2.22;
   };
 
   outputs = { self, nixpkgs, build-utils
@@ -20,7 +20,7 @@
                     }:
         mkDerivation {
           pname = "env-plus";
-          version = "1.0.7.33";
+          version = "1.0.7.35";
           src = ./.;
           libraryHaskellDepends = [
             base containers data-textual deepseq lens mono-traversable mtl
