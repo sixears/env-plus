@@ -56,6 +56,10 @@ import Data.MonoTraversable  ( Element, MonoFunctor( omap ) )
 
 import Control.Monad.State  ( execState, modify )
 
+-- parsec-plus-base --------------------
+
+import ParsecPlusBase  ( Parsecable( parser ) )
+
 -- parsers -----------------------------
 
 import Text.Parser.Char  ( anyChar )
@@ -101,6 +105,9 @@ instance FromP EnvKey where
 instance TMap EnvKey where
   tmap f = EnvKey ∘ f ∘ unKey
 
+instance Parsecable EnvKey where
+  parser = textual
+
 ------------------------------------------------------------
 
 newtype EnvVal  = EnvVal { unVal ∷ 𝕋 }
@@ -120,6 +127,9 @@ instance FromP EnvVal where
 
 instance TMap EnvVal where
   tmap f = EnvVal ∘ f ∘ unVal
+
+instance Parsecable EnvVal where
+  parser = textual
 
 ------------------------------------------------------------
 

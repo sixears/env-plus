@@ -7,7 +7,7 @@ name:                env-plus
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             1.0.7.37
+version:             1.0.8.0
 
 -- A short (one-line) description of the package.
 synopsis:            Utilities for working with the system environment
@@ -77,8 +77,9 @@ library
   build-depends:       base, containers, data-textual, deepseq, lens
                      , mono-traversable, mtl, parsers, text, text-printer, unix
 
-                     , base1t        >= 0.0.4.0
-                     , tasty-plus    >= 1.5.1.1
+                     , base1t           >= 0.0.4.0
+                     , parsec-plus-base >= 1.0.5.23
+                     , tasty-plus       >= 1.5.1.1
 
   -- Directories containing source files.
   hs-source-dirs:      src

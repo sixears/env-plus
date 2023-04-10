@@ -1,3 +1,8 @@
+1.0.8.0 2023-04-10
+==================
+- new dependency: parsec-plus-base
+- add Parsecable instances of EnvKey,EnvVal
+
 1.0.7.37 2022-11-20
 ===================
 - has-callstack->1.0.1.19
