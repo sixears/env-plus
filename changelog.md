@@ -1,3 +1,7 @@
+1.0.9.0 2023-04-13
+==================
+- some additions to EnvModFrag
+
 1.0.8.0 2023-04-10
 ==================
 - new dependency: parsec-plus-base

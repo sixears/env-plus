@@ -35,8 +35,8 @@ import qualified System.Posix.Env  as  PosixEnv
 --                     local imports                      --
 ------------------------------------------------------------
 
-import Env.Types  ( Env, EnvKey, EnvMod, EnvVal, ә, clearEnvMod, fromListT
-                  , fromP, setEnvMod, strsEnv, runEnvMod' )
+import Env.Types  ( Env, EnvKey, EnvMod, EnvVal, ә, clearEnvMod
+                  , fromListT, fromP, setEnvMod, strsEnv, runEnvMod' )
 
 --------------------------------------------------------------------------------
 
@@ -146,8 +146,10 @@ withEnvModTests =
    in testGroup "withEnv…" $
       [ ioTests "withEnv"
                 [ ("get HOME (pre)", \ h → getEnv home ≫ (@=? h))
-                , ("set HOME", const $
-                      withEnv modEnv getEnvironment ≫ (@=? [(home,nonesuch)]))
+                , ("set HOME",
+                    const $
+                      withEnv modEnv getEnvironment ≫
+                        (@=? fromList [(home,nonesuch)]))
                 , ("get HOME (post)", \ h → getEnv home ≫ (@=? h))
                 ]
                 (getEnv home)
@@ -155,9 +157,9 @@ withEnvModTests =
                 [ ("get HOME (pre)", \ h → getEnv home ≫ (@=? h))
                 , ("set HOME", const $
                       withEnvMod modEnv getEnvironment ≫ \ (env,msgs',e) → do
-                        (([(home,nonesuch)]) @=? env)
+                        ((fromList [(home,nonesuch)]) @=? env)
                         msgs @=? msgs'
-                        e @=? [(home,nonesuch)]
+                        e @=? fromList [(home,nonesuch)]
                   )
                 , ("get HOME (post)", \ h → getEnv home ≫ (@=? h))
                 ]

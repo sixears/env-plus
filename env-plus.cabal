@@ -7,7 +7,7 @@ name:                env-plus
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             1.0.8.0
+version:             1.0.9.0
 
 -- A short (one-line) description of the package.
 synopsis:            Utilities for working with the system environment
@@ -53,6 +53,7 @@ library
 
   default-extensions:  ConstraintKinds
                      , DeriveGeneric
+                     , DeriveLift
                      , FlexibleContexts
                      , FlexibleInstances
                      , GeneralizedNewtypeDeriving
@@ -60,12 +61,12 @@ library
                      , LambdaCase
                      , MultiParamTypeClasses
                      , NoImplicitPrelude
-                     , OverloadedLists
                      , OverloadedStrings
                      , QuasiQuotes
                      , RankNTypes
                      , ScopedTypeVariables
                      , TupleSections
+                     , TypeApplications
                      , TypeFamilies
                      , UnicodeSyntax
                      , ViewPatterns
@@ -75,10 +76,12 @@ library
 
   -- Other library packages from which modules are imported.
   build-depends:       base, containers, data-textual, deepseq, lens
-                     , mono-traversable, mtl, parsers, text, text-printer, unix
+                     , mono-traversable, mtl, parsers, template-haskell, text
+                     , text-printer, unix
 
                      , base1t           >= 0.0.4.0
                      , parsec-plus-base >= 1.0.5.23
+                     , quasiquoting     >= 1.0.1.32
                      , tasty-plus       >= 1.5.1.1
 
   -- Directories containing source files.
